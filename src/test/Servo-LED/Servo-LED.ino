@@ -1,8 +1,8 @@
 #include <FastLED.h>
 
-#define SERVO 18
+#define SERVO 19
 #define POT 34
-#define LED 19
+#define LED 18
 #define NUM_LEDS 35               
 
 CRGB leds[NUM_LEDS];              
@@ -13,13 +13,19 @@ void setup() {
   pinMode(POT, INPUT);
   FastLED.addLeds<WS2812, LED, GRB>(leds, NUM_LEDS);  
 }
-
+int pot = 100;
 void loop() {
-  int pot = analogRead(POT);
+
   int pwm = (500 + (pot * 2000) / 4095) / 50 * 50;
   int brightness = (pot * 255) / 4095;
   servo(pwm);
   led(brightness);
+
+  if (pot > 4000) {
+    pot-=100;
+  } else if (pot < 100) {
+    pot+=100;
+  }
 }
 
 void servo(int pwm) {
