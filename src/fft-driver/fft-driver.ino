@@ -2,28 +2,38 @@
 #include "AudioTools.h"
 #include "AudioTools/AudioLibs/AudioRealFFT.h"
 
-#define SERVO 18
-#define POT 34
-#define LED 19
+// Pin Definitions
+#define SERVO 19
+#define LED 18
 #define NUM_LEDS 35               
 CRGB leds[NUM_LEDS]; 
 #define WS 25  
 #define SCK 33
 #define SD 32
 
-uint16_t sample_rate=44100;
-uint8_t channels = 2; 
+// Audio Configuration
+uint16_t sample_rate = 44100;
+uint8_t channels = 2;
 I2SStream in;
 AudioRealFFT fft;
-StreamCopy copier(fft, in);   
+StreamCopy copier(fft, in);
+
+// Variables
 int pot = 0;        
 
 void setup() {
+  // Initialize Serial
   Serial.begin(115200);
-  pinMode(SERVO, OUTPUT);
-  pinMode(POT, INPUT);
-  FastLED.addLeds<WS2812, LED, GRB>(leds, NUM_LEDS);  
 
+  // Initialize Pins
+  pinMode(SERVO, OUTPUT);
+
+  // Initialize LEDs
+  FastLED.addLeds<WS2812, LED, GRB>(leds, NUM_LEDS);
+  FastLED.clear();
+  FastLED.show();
+
+  // Configure I2S Input
   auto configin = in.defaultConfig(RX_MODE);
   configin.sample_rate = sample_rate; 
   configin.channels = channels;
@@ -35,11 +45,13 @@ void setup() {
   configin.pin_bck = SCK;                            
   configin.pin_data = SD;                        
   configin.pin_mck = 0;
-  in.begin(configin); 
+  
+  if (!in.begin(configin)) {
+    Serial.println("Failed to initialize I2S!");
+    while (1); // Halt for debugging
+  }
 
-  //
   // Configure FFT
-  //
   auto tcfg = fft.defaultConfig();
   tcfg.length = 8192;
   tcfg.channels = channels;
@@ -50,9 +62,10 @@ void setup() {
 }
 
 void loop() {
-  copier.copy();
+  copier.copy(); // Continuously process audio
 }
 
+// Servo Control Function
 void servo(int pwm) {
   digitalWrite(SERVO, HIGH);
   delayMicroseconds(pwm);
@@ -62,35 +75,42 @@ void servo(int pwm) {
   delay(50);
 }
 
+// LED Control Function
 void led(int brightness) {
-  for (int i = 0; i < NUM_LEDS; i++) {
-    leds[i] = CHSV(0, 0, brightness);  
+  static int prevBrightness = -1;
+  if (brightness != prevBrightness) {
+    prevBrightness = brightness;
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CHSV(0, 0, brightness);  
+    }
+    FastLED.show();
   }
-  FastLED.show();
 }
 
+// FFT Result Processing
 void fftResult(AudioFFTBase &fft) {
   float diff;
   auto result = fft.result();
 
-  if (result.magnitude>100)
-  {
-      Serial.print(result.frequency);
-      Serial.print(" => ");
-      Serial.println(result.frequencyAsNote(diff));
-  }
+  // Only process significant magnitudes
+  if (result.magnitude > 10) {
+    Serial.print(result.frequency);
+    Serial.print(" => ");
+    Serial.println(result.frequencyAsNote(diff));
 
-  int increment = 50;
-  if (result.frequency > 100) {
-    if (result.frequency > 1200) {
-      pot = (pot < 4095 - increment) ? pot + increment : 4095;
-    } else {
-      pot = (pot > increment) ? pot - increment : 0;
+    // Adjust pot value based on frequency range
+    int increment = 100;
+    if (result.frequency > 500 && result.frequency < 2000) {
+      pot = (result.frequency > 1400) ? min(pot + increment, 4095)
+                                     : max(pot - increment, 0);
     }
-  }
 
-  int pwm = (500 + (pot * 2000) / 4095);
-  int brightness = (pot * 255) / 4095;
-  servo(pwm);
-  led(brightness);
+    // Map pot value to servo PWM and LED brightness
+    int pwm = constrain((500 + (pot * 2000) / 4095), 500, 2500);
+    int brightness = (pot * 255) / 4095;
+
+    // Update servo and LEDs
+    servo(pwm);
+    led(brightness);
+  }
 }
