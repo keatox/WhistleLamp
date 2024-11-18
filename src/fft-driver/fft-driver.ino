@@ -19,7 +19,9 @@ AudioRealFFT fft;
 StreamCopy copier(fft, in);
 
 // Variables
-int pot = 0;        
+int servo = 2000;
+int led = 0;     
+bool flip = true;   
 
 void setup() {
   // Initialize Serial
@@ -65,8 +67,44 @@ void loop() {
   copier.copy(); // Continuously process audio
 }
 
+// FFT Result Processing
+void fftResult(AudioFFTBase &fft) {
+  float diff;
+  auto result = fft.result();
+
+  // Only process significant magnitudes
+  if (result.magnitude > 100) {
+    if (flip) {
+      Serial.print("servo ");
+    } else {
+      Serial.print("led ");
+    }
+    Serial.print(result.frequency);
+    Serial.print(" => ");
+    Serial.println(result.frequencyAsNote(diff));
+
+    // Adjust value based on frequency range
+    int increment = 100;
+    if (result.frequency > 1000 && result.frequency < 2000) {
+      // Map value to servo PWM and LED brightness
+      if (flip) {
+        servo = (result.frequency > 1500) ? min(servo + increment, 4095) : max(servo - increment, 0);
+        int pwm = constrain((500 + (servo * 2000) / 4095), 500, 2500);
+        servoControl(pwm);
+      } else {
+        led = (result.frequency > 1500) ? min(led + increment, 4095) : max(led - increment, 0);
+        int brightness = (led * 255) / 4095;
+        ledControl(brightness);
+      }
+    } else if (result.frequency > 600) {
+      flip = !flip;
+      flipNotify();
+    }
+  }
+}
+
 // Servo Control Function
-void servo(int pwm) {
+void servoControl(int pwm) {
   digitalWrite(SERVO, HIGH);
   delayMicroseconds(pwm);
   digitalWrite(SERVO, LOW);
@@ -76,7 +114,7 @@ void servo(int pwm) {
 }
 
 // LED Control Function
-void led(int brightness) {
+void ledControl(int brightness) {
   static int prevBrightness = -1;
   if (brightness != prevBrightness) {
     prevBrightness = brightness;
@@ -87,30 +125,14 @@ void led(int brightness) {
   }
 }
 
-// FFT Result Processing
-void fftResult(AudioFFTBase &fft) {
-  float diff;
-  auto result = fft.result();
-
-  // Only process significant magnitudes
-  if (result.magnitude > 10) {
-    Serial.print(result.frequency);
-    Serial.print(" => ");
-    Serial.println(result.frequencyAsNote(diff));
-
-    // Adjust pot value based on frequency range
-    int increment = 100;
-    if (result.frequency > 500 && result.frequency < 2000) {
-      pot = (result.frequency > 1400) ? min(pot + increment, 4095)
-                                     : max(pot - increment, 0);
+void flipNotify() {
+  for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CHSV(0, 0, 150);  
+      delay(100);
+      FastLED.show();
+      leds[i] = CHSV(0, 0, 0);
+      FastLED.show();
     }
-
-    // Map pot value to servo PWM and LED brightness
-    int pwm = constrain((500 + (pot * 2000) / 4095), 500, 2500);
-    int brightness = (pot * 255) / 4095;
-
-    // Update servo and LEDs
-    servo(pwm);
-    led(brightness);
-  }
+    ledControl(brightness);
 }
+
