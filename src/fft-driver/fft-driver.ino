@@ -20,7 +20,9 @@ StreamCopy copier(fft, in);
 
 // Variables
 int servo = 2000;
-int led = 0;     
+int pwm;
+int led = 0;   
+int brightness;  
 bool flip = true;   
 
 void setup() {
@@ -73,7 +75,7 @@ void fftResult(AudioFFTBase &fft) {
   auto result = fft.result();
 
   // Only process significant magnitudes
-  if (result.magnitude > 100) {
+  if (result.magnitude > 150) {
     if (flip) {
       Serial.print("servo ");
     } else {
@@ -85,20 +87,22 @@ void fftResult(AudioFFTBase &fft) {
 
     // Adjust value based on frequency range
     int increment = 100;
-    if (result.frequency > 1000 && result.frequency < 2000) {
-      // Map value to servo PWM and LED brightness
-      if (flip) {
-        servo = (result.frequency > 1500) ? min(servo + increment, 4095) : max(servo - increment, 0);
-        int pwm = constrain((500 + (servo * 2000) / 4095), 500, 2500);
-        servoControl(pwm);
-      } else {
-        led = (result.frequency > 1500) ? min(led + increment, 4095) : max(led - increment, 0);
-        int brightness = (led * 255) / 4095;
-        ledControl(brightness);
+    if (result.frequency < 2000) {
+      if (result.frequency > 1000) {
+        // Map value to servo PWM and LED brightness
+        if (flip) {
+          servo = (result.frequency > 1500) ? min(servo + increment, 4095) : max(servo - increment, 0);
+          pwm = constrain((500 + (servo * 2000) / 4095), 500, 2500);
+          servoControl(pwm);
+        } else {
+          led = (result.frequency > 1500) ? min(led + increment, 4095) : max(led - increment, 0);
+          brightness = (led * 255) / 4095;
+          ledControl(brightness);
+        }
+      } else if (result.frequency > 600) {
+        flip = !flip;
+        flipNotify();
       }
-    } else if (result.frequency > 600) {
-      flip = !flip;
-      flipNotify();
     }
   }
 }
