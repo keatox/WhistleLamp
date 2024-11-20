@@ -2,23 +2,25 @@
 #include "AudioTools.h"
 #include "AudioTools/AudioLibs/AudioRealFFT.h"
 
-// Pin Definitions
+// pin definition
 #define SERVO 19
 #define LED 18
 #define NUM_LEDS 35               
-CRGB leds[NUM_LEDS]; 
 #define WS 25  
 #define SCK 33
 #define SD 32
 
-// Audio Configuration
+// LED ring bit data
+CRGB leds[NUM_LEDS]; 
+
+// audio config
 uint16_t sample_rate = 44100;
 uint8_t channels = 2;
 I2SStream in;
 AudioRealFFT fft;
 StreamCopy copier(fft, in);
 
-// Variables
+// global positioning variables
 int servo = 2000;
 int pwm;
 int led = 0;   
@@ -26,18 +28,17 @@ int brightness;
 bool flip = true;   
 
 void setup() {
-  // Initialize Serial
   Serial.begin(115200);
 
-  // Initialize Pins
+  // initialize servo pin
   pinMode(SERVO, OUTPUT);
 
-  // Initialize LEDs
+  // initialize LED ring
   FastLED.addLeds<WS2812, LED, GRB>(leds, NUM_LEDS);
   FastLED.clear();
   FastLED.show();
 
-  // Configure I2S Input
+  // I2S config
   auto configin = in.defaultConfig(RX_MODE);
   configin.sample_rate = sample_rate; 
   configin.channels = channels;
@@ -55,7 +56,7 @@ void setup() {
     while (1); // Halt for debugging
   }
 
-  // Configure FFT
+  // FFT algo config
   auto tcfg = fft.defaultConfig();
   tcfg.length = 8192;
   tcfg.channels = channels;
@@ -66,15 +67,15 @@ void setup() {
 }
 
 void loop() {
-  copier.copy(); // Continuously process audio
+  copier.copy(); // runs fft process
 }
 
-// FFT Result Processing
+// FFT processing
 void fftResult(AudioFFTBase &fft) {
   float diff;
   auto result = fft.result();
 
-  // Only process significant magnitudes
+  // minimum audio volume threshold
   if (result.magnitude > 150) {
     if (flip) {
       Serial.print("servo ");
@@ -85,11 +86,11 @@ void fftResult(AudioFFTBase &fft) {
     Serial.print(" => ");
     Serial.println(result.frequencyAsNote(diff));
 
-    // Adjust value based on frequency range
+    // adjust for frequencies within given range
     int increment = 100;
     if (result.frequency < 2000) {
       if (result.frequency > 1000) {
-        // Map value to servo PWM and LED brightness
+        // map value to given output
         if (flip) {
           servo = (result.frequency > 1500) ? min(servo + increment, 4095) : max(servo - increment, 0);
           pwm = constrain((500 + (servo * 2000) / 4095), 500, 2500);
@@ -99,6 +100,7 @@ void fftResult(AudioFFTBase &fft) {
           brightness = (led * 255) / 4095;
           ledControl(brightness);
         }
+      // flips output mode
       } else if (result.frequency > 800) {
         flip = !flip;
         flipNotify();
@@ -107,7 +109,7 @@ void fftResult(AudioFFTBase &fft) {
   }
 }
 
-// Servo Control Function
+// servo control
 void servoControl(int pwm) {
   digitalWrite(SERVO, HIGH);
   delayMicroseconds(pwm);
@@ -117,7 +119,7 @@ void servoControl(int pwm) {
   delay(50);
 }
 
-// LED Control Function
+// LED control
 void ledControl(int brightness) {
   for (int i = 0; i < NUM_LEDS; i++) {
     leds[i] = CHSV(0, 0, brightness);  
@@ -125,7 +127,9 @@ void ledControl(int brightness) {
   FastLED.show();
 }
 
+// uses LED to notify output change
 void flipNotify() {
+  // runs a circular light loop across LED ring
   for (int i = 0; i < NUM_LEDS; i++) {
       leds[i] = CHSV(0, 0, 150);  
       FastLED.show();
