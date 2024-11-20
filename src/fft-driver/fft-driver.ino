@@ -99,7 +99,7 @@ void fftResult(AudioFFTBase &fft) {
           brightness = (led * 255) / 4095;
           ledControl(brightness);
         }
-      } else if (result.frequency > 600) {
+      } else if (result.frequency > 800) {
         flip = !flip;
         flipNotify();
       }
@@ -132,8 +132,8 @@ void ledControl(int brightness) {
 void flipNotify() {
   for (int i = 0; i < NUM_LEDS; i++) {
       leds[i] = CHSV(0, 0, 150);  
-      delay(100);
       FastLED.show();
+      delay(10);
       leds[i] = CHSV(0, 0, 0);
       FastLED.show();
     }
