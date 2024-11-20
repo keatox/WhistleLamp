@@ -119,14 +119,10 @@ void servoControl(int pwm) {
 
 // LED Control Function
 void ledControl(int brightness) {
-  static int prevBrightness = -1;
-  if (brightness != prevBrightness) {
-    prevBrightness = brightness;
-    for (int i = 0; i < NUM_LEDS; i++) {
-      leds[i] = CHSV(0, 0, brightness);  
-    }
-    FastLED.show();
+  for (int i = 0; i < NUM_LEDS; i++) {
+    leds[i] = CHSV(0, 0, brightness);  
   }
+  FastLED.show();
 }
 
 void flipNotify() {
