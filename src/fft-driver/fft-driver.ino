@@ -87,7 +87,7 @@ void fftResult(AudioFFTBase &fft) {
     Serial.println(result.frequencyAsNote(diff));
 
     // adjust for frequencies within given range
-    int increment = 100;
+    int increment = 50;
     if (result.frequency < 2000) {
       if (result.frequency > 1000) {
         // map value to given output
